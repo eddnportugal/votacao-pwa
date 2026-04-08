@@ -1,0 +1,14 @@
+django>=4.2,<5.0
+djangorestframework>=3.14
+djangorestframework-simplejwt>=5.3
+django-cors-headers>=4.3
+webauthn>=2.7               # WebAuthn validation (server-side)
+psycopg2-binary>=2.9
+django-otp>=1.3
+celery>=5.3
+redis>=5.0
+reportlab>=4.0
+python-dotenv>=1.0
+gunicorn>=21.2
+django-filter>=23.5
+dj-database-url>=2.1
