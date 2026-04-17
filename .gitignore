@@ -6,6 +6,9 @@ __pycache__/
 # Environment
 .env
 *.env.local
+.env.coolify
+.env.production
+backend/.env.production
 
 # IDE
 .vscode/
@@ -37,3 +40,9 @@ public/sw.js
 public/workbox-*.js
 public/sw.js.map
 public/workbox-*.js.map
+
+# Data exports
+*.csv
+*.txt
+!README.md
+!requirements.txt

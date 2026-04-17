@@ -1,3 +1,4 @@
+from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
@@ -5,6 +6,7 @@ from django.conf import settings
 from rest_framework import generics, permissions, serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 
 from apps.condominios.models import Condominio
@@ -61,6 +63,34 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
+
+
+@api_view(["POST"])
+@permission_classes([permissions.AllowAny])
+def login_view(request):
+    username = str(request.data.get("username", "")).strip()
+    password = str(request.data.get("password", ""))
+
+    if not username or not password:
+        return Response(
+            {"detail": "Username e password são obrigatórios."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user = authenticate(username=username, password=password)
+    if user is None:
+        return Response(
+            {"detail": "Usuário e/ou senha incorreto(s)"},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    refresh = RefreshToken.for_user(user)
+    return Response(
+        {
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+        }
+    )
 
 
 class MeView(APIView):

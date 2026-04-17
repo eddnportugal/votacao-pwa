@@ -1,9 +1,11 @@
 import secrets
 
+from django.conf import settings
+from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from core.permissions import IsAdminWithRole, get_user_condominios
@@ -35,9 +37,28 @@ class EleitorViewSet(viewsets.ModelViewSet):
         if not eleitor.convite_token:
             eleitor.convite_token = secrets.token_urlsafe(48)
             eleitor.save(update_fields=["convite_token"])
-        # TODO: Send email with invite link (Sprint 7)
+
+        frontend_base_url = getattr(settings, "FRONTEND_APP_URL", "http://localhost:3000").rstrip("/")
+        convite_url = f"{frontend_base_url}/cadastro/{eleitor.convite_token}"
+
+        send_mail(
+            subject="Convite para cadastro - Votação Online",
+            message=(
+                f"Olá, {eleitor.nome}.\n\n"
+                f"Acesse o link abaixo para concluir seu cadastro:\n{convite_url}\n\n"
+                "Se você não solicitou este acesso, ignore esta mensagem."
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[eleitor.email],
+            fail_silently=False,
+        )
+
         return Response(
-            {"message": "Convite gerado", "token": eleitor.convite_token},
+            {
+                "message": "Convite enviado",
+                "token": eleitor.convite_token,
+                "url": convite_url,
+            },
             status=status.HTTP_200_OK,
         )
 
@@ -70,13 +91,11 @@ class EleitorViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         eleitor.biometria_hash = serializer.validated_data["biometria_hash"]
-        eleitor.webauthn_credential = serializer.validated_data["webauthn_credential"]
         eleitor.cadastro_completo = True
         eleitor.convite_token = None  # Invalidate token after use
         eleitor.save(
             update_fields=[
                 "biometria_hash",
-                "webauthn_credential",
                 "cadastro_completo",
                 "convite_token",
             ]

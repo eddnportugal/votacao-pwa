@@ -1,6 +1,7 @@
 """
 Biometria facial REST API — verificação de identidade durante a votação.
-A comparação real é feita no client (euclidiana); o servidor confirma o hash como 2º fator.
+O cliente compara o descritor localmente e o servidor exige o hash do descritor
+de cadastro para emitir o token de votação.
 """
 from django.core import signing
 from django.shortcuts import get_object_or_404
@@ -11,9 +12,6 @@ from rest_framework.response import Response
 
 from apps.eleitores.models import Eleitor
 from apps.assembleias.models import Presenca
-from core.biometria import hash_vetor_facial
-
-
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def facial_auth_verify(request):
@@ -42,11 +40,11 @@ def facial_auth_verify(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Nota: em produção com descritores reais, a comparação por hash exato é
-    # extremamente sensível. O client já validou por distância euclidiana;
-    # este endpoint serve como 2º fator de confirmação do cadastro.
-    # Para o MVP, aceitamos se o eleitor tem biometria cadastrada e o client
-    # afirmou match (o hash pode diferir ligeiramente entre capturas).
+    if face_hash != eleitor.biometria_hash:
+        return Response(
+            {"error": "Assinatura facial inválida para este dispositivo cadastrado"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
     vote_token = signing.dumps(
         {
@@ -68,7 +66,7 @@ def facial_auth_verify(request):
                 "apartamento": eleitor.apartamento,
                 "perfil": eleitor.perfil,
                 "metodo_auth": "facial",
-                "assinatura_facial": face_hash[:64] if face_hash else "",
+                "assinatura_facial": face_hash,
             },
         )
 

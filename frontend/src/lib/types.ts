@@ -99,7 +99,7 @@ export interface VotoPayload {
   eleitor_id: string;
   questao_id: string;
   opcao_id: string;
-  metodo_auth: "facial" | "webauthn" | "otp";
+  auth_token: string;
 }
 
 export interface VotoResponse {
@@ -121,6 +121,30 @@ export interface Resultado {
   total_votantes: number;
   percentual_participacao: number;
   opcoes: OpcaoResultado[];
+}
+
+export interface RelatorioVotoItem {
+  id: string;
+  eleitor_nome: string;
+  bloco: string;
+  apartamento: string;
+  perfil: "proprietario" | "procurador";
+  por_procuracao: boolean;
+  questao_titulo: string;
+  opcao_texto: string;
+  tipo_autenticacao: "facial" | "webauthn" | "otp";
+  ip_address: string;
+  device_info: string;
+  user_agent: string;
+  timestamp: string;
+  hash_voto: string;
+}
+
+export interface RelatorioVotoResponse {
+  assembleia_id: string;
+  assembleia_titulo: string;
+  total_registros: number;
+  votos: RelatorioVotoItem[];
 }
 
 // === Auth ===

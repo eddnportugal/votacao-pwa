@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Download } from "lucide-react";
 import { api } from "@/lib/api";
 import type { AssembleiaListItem, Resultado } from "@/lib/types";
 
@@ -9,6 +10,67 @@ export default function ResultadosPage() {
   const [selected, setSelected] = useState<string>("");
   const [resultados, setResultados] = useState<Resultado[]>([]);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  function csvValue(value: string | number | boolean | null | undefined) {
+    const text = value == null ? "" : String(value);
+    return `"${text.replaceAll('"', '""')}"`;
+  }
+
+  async function exportarRelatorioDetalhado() {
+    if (!selected) return;
+    setExporting(true);
+
+    try {
+      const relatorio = await api.getRelatorioVotos(selected);
+      const header = [
+        "Nome",
+        "Bloco",
+        "Apartamento",
+        "Perfil",
+        "Por procuração",
+        "Questão",
+        "Opção escolhida",
+        "Tipo da autenticação",
+        "IP",
+        "Aparelho/Navegador",
+        "User-Agent",
+        "Data e horário",
+        "Hash do voto",
+      ];
+      const rows = relatorio.votos.map((voto) => [
+        voto.eleitor_nome,
+        voto.bloco,
+        voto.apartamento,
+        voto.perfil,
+        voto.por_procuracao ? "Sim" : "Não",
+        voto.questao_titulo,
+        voto.opcao_texto,
+        voto.tipo_autenticacao,
+        voto.ip_address,
+        voto.device_info,
+        voto.user_agent,
+        new Date(voto.timestamp).toLocaleString("pt-BR"),
+        voto.hash_voto,
+      ]);
+      const csv = [header, ...rows]
+        .map((row) => row.map((value) => csvValue(value)).join(";"))
+        .join("\r\n");
+      const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `relatorio-votos-${relatorio.assembleia_titulo.toLowerCase().replace(/[^a-z0-9]+/gi, "-")}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Erro ao exportar relatório detalhado.");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     api.getAssembleias().then((d) => {
@@ -46,18 +108,32 @@ export default function ResultadosPage() {
       <h1 className="text-2xl font-bold mb-6">Resultados</h1>
 
       <div className="mb-6">
-        <select
-          value={selected}
-          onChange={(e) => setSelected(e.target.value)}
-          className="input-field w-80"
-        >
-          <option value="">Selecione uma assembleia...</option>
-          {assembleias.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.titulo} ({a.status})
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <select
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+            className="input-field w-80"
+          >
+            <option value="">Selecione uma assembleia...</option>
+            {assembleias.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.titulo} ({a.status})
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={exportarRelatorioDetalhado}
+            disabled={!selected || exporting}
+            className="btn-secondary inline-flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" />
+            {exporting ? "Gerando relatório..." : "Exportar Relatório Detalhado"}
+          </button>
+        </div>
+        <p className="mt-2 text-sm text-gray-500">
+          O relatório detalhado inclui nome, bloco, apartamento, perfil, IP, autenticação, data/hora e aparelho inferido pelo navegador no momento do voto.
+        </p>
       </div>
 
       {loading && <p className="text-gray-500">Carregando resultados...</p>}

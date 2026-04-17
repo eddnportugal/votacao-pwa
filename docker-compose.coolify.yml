@@ -1,0 +1,80 @@
+# docker-compose.coolify.yml
+# Stack de produção para Hetzner + Coolify + Traefik v3
+# Domínio: appvotacao.com.br | Servidor: 46.225.191.114
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: votacao-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-votacao_db}
+      POSTGRES_USER: ${POSTGRES_USER:-votacao}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - votacao_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-votacao} -d ${POSTGRES_DB:-votacao_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    container_name: votacao-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - internal
+
+  backend:
+    build: ./backend
+    container_name: votacao-backend
+    restart: unless-stopped
+    env_file: ./backend/.env.production
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-votacao}:${POSTGRES_PASSWORD}@votacao-db:5432/${POSTGRES_DB:-votacao_db}
+      CELERY_BROKER_URL: redis://votacao-redis:6379/0
+      CELERY_RESULT_BACKEND: redis://votacao-redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+      - coolify
+    labels:
+      - "traefik.enable=false"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: https://appvotacao.com.br/api
+    container_name: votacao-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: https://appvotacao.com.br/api
+    depends_on:
+      - backend
+    networks:
+      - internal
+      - coolify
+    labels:
+      - "traefik.enable=false"
+
+volumes:
+  votacao_postgres:
+
+networks:
+  internal:
+    driver: bridge
+  coolify:
+    external: true

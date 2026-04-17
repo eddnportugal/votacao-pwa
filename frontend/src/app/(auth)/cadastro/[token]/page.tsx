@@ -98,7 +98,6 @@ export default function CadastroPage() {
               try {
                 await api.onboarding(token, {
                   biometria_hash: "otp-only",
-                  webauthn_credential: { skipped: true },
                 });
                 setStep("done");
               } catch {
@@ -117,7 +116,6 @@ export default function CadastroPage() {
               try {
                 await api.onboarding(token, {
                   biometria_hash: biometriaHash || "no-face-capture",
-                  webauthn_credential: { registered: true },
                 });
                 setStep("done");
               } catch {
@@ -128,7 +126,6 @@ export default function CadastroPage() {
               try {
                 await api.onboarding(token, {
                   biometria_hash: biometriaHash || "no-face-capture",
-                  webauthn_credential: { skipped: true },
                 });
                 setStep("done");
               } catch {

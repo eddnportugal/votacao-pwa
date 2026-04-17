@@ -27,4 +27,4 @@ class EleitorSerializer(serializers.ModelSerializer):
 
 class EleitorOnboardingSerializer(serializers.Serializer):
     biometria_hash = serializers.CharField(max_length=64)
-    webauthn_credential = serializers.JSONField()
+    webauthn_credential = serializers.JSONField(required=False)

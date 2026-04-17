@@ -155,7 +155,7 @@ export default function ContratoPage() {
             </h2>
             <p className="text-sm text-gray-700 leading-relaxed mb-4">
               O presente contrato tem por objeto a prestação de serviços de licenciamento,
-              hospedagem e manutenção do sistema <strong>"Votação Online"</strong>, plataforma digital
+              hospedagem e manutenção do sistema <strong>&quot;Votação Online&quot;</strong>, plataforma digital
               (SaaS — Software as a Service) acessível via navegador web e dispositivos móveis,
               destinada à realização de assembleias e votações condominiais digitais com
               autenticação biométrica, compreendendo:
@@ -337,7 +337,7 @@ export default function ContratoPage() {
               DA PROPRIEDADE INTELECTUAL
             </h2>
             <div className="text-sm text-gray-700 space-y-2">
-              <p><strong>9.1.</strong> O sistema "Votação Online", incluindo código-fonte, design, documentação e marca, é de propriedade exclusiva da <strong>APP GROUP LTDA - ME</strong>.</p>
+              <p><strong>9.1.</strong> O sistema &quot;Votação Online&quot;, incluindo código-fonte, design, documentação e marca, é de propriedade exclusiva da <strong>APP GROUP LTDA - ME</strong>.</p>
               <p><strong>9.2.</strong> O presente contrato não transfere qualquer direito de propriedade intelectual à CONTRATANTE, que recebe apenas licença de uso não-exclusiva durante a vigência contratual.</p>
             </div>
           </section>

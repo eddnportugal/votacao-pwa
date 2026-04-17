@@ -37,6 +37,28 @@ docker compose exec backend python manage.py createsuperuser
 # MinIO Console: http://localhost:9001 (minio / minio123)
 ```
 
+## Produção
+
+1. Configure as variáveis de ambiente do backend a partir de [backend/.env.example](backend/.env.example).
+2. Configure as variáveis raiz do compose a partir de [.env.production.example](.env.production.example).
+3. Defina `APP_DOMAIN` com o domínio público do sistema e `ACME_EMAIL` para emissão de certificado TLS.
+4. Defina `NEXT_PUBLIC_API_URL` como `https://SEU_DOMINIO/api` se quiser sobrescrever o valor padrão.
+5. Aponte o DNS do Cloudflare para o IP do servidor e mantenha o registro como `DNS only` na primeira subida.
+6. Use SSL/TLS `Full (strict)` no Cloudflare.
+7. Suba a stack com `docker compose -f docker-compose.prod.yml up -d --build`.
+8. Rode `docker compose -f docker-compose.prod.yml exec backend python manage.py migrate`.
+
+Guia complementar:
+- Veja [deploy/cloudflare-setup.md](deploy/cloudflare-setup.md) para o modelo de DNS, SSL e sequência de publicação.
+
+Notas de produção:
+- O backend agora envia convites por e-mail usando `FRONTEND_APP_URL` para montar o link de onboarding.
+- O frontend usa build standalone para container.
+- O Django aplica flags de segurança quando `DJANGO_DEBUG=False`.
+- A stack de produção usa um proxy Caddy em [deploy/Caddyfile](deploy/Caddyfile) para servir frontend e backend no mesmo domínio com HTTPS.
+- Esta arquitetura usa domínio único: frontend em `/` e backend em `/api/*`.
+- O service worker do PWA continua ativo, mas rotas `/api/*` não são cacheadas para evitar dados desatualizados durante autenticação e votação.
+
 ## Setup Local (sem Docker)
 
 ### Backend
@@ -148,3 +170,9 @@ votacao-pwa/
 - **CPF**: hasheado com SHA-256 no browser antes do envio.
 - **Votos**: hash com salt único por eleitor — verificável mas não rastreável.
 - **JWT**: access token 30min, refresh 24h, rotação automática.
+
+## Qualidade
+
+- `npm run lint` configurado com `next/core-web-vitals`.
+- Testes backend cobrem login JWT local, onboarding sem sobrescrever WebAuthn e verificação facial no servidor.
+- Pipeline em `.github/workflows/ci.yml` executa testes do backend, lint do frontend e build de produção.

@@ -151,7 +151,7 @@ export default function VotacaoPage() {
   }
 
   async function handleVotar() {
-    if (!selectedOpcao || !questao) return;
+    if (!selectedOpcao || !questao || !authToken) return;
     setVotando(true);
 
     try {
@@ -159,7 +159,7 @@ export default function VotacaoPage() {
         eleitor_id: eleitorId,
         questao_id: questao.id,
         opcao_id: selectedOpcao,
-        metodo_auth: authToken === "otp-fallback" ? "otp" : authMethod,
+        auth_token: authToken,
       });
 
       setComprovantes((prev) => [

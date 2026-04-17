@@ -29,6 +29,8 @@ class Voto(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     metodo_auth = models.CharField(max_length=20, choices=MetodoAuth.choices)
     ip_address = models.GenericIPAddressField()
+    user_agent = models.TextField(blank=True, default="")
+    device_info = models.CharField(max_length=255, blank=True, default="")
     hash_voto = models.CharField(max_length=64, unique=True)
 
     class Meta:

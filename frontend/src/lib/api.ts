@@ -9,6 +9,7 @@ import type {
   PaginatedResponse,
   Questao,
   Resultado,
+  RelatorioVotoResponse,
   User,
   VotoPayload,
   VotoResponse,
@@ -135,7 +136,7 @@ export const api = {
     }),
 
   enviarConvite: (eleitorId: string) =>
-    request<{ message: string; token: string }>(
+    request<{ message: string; token: string; url: string }>(
       `/eleitores/${eleitorId}/enviar-convite/`,
       { method: "POST" }
     ),
@@ -150,7 +151,7 @@ export const api = {
 
   onboarding: (
     token: string,
-    data: { biometria_hash: string; webauthn_credential: any }
+    data: { biometria_hash: string; webauthn_credential?: any }
   ) =>
     request<{ message: string }>(`/eleitores/onboarding/${token}/`, {
       method: "POST",
@@ -245,6 +246,9 @@ export const api = {
 
   getResultados: (assembleiaId: string) =>
     request<Resultado[]>(`/votos/${assembleiaId}/resultados/`),
+
+  getRelatorioVotos: (assembleiaId: string) =>
+    request<RelatorioVotoResponse>(`/votos/${assembleiaId}/relatorio/`),
 
   verificarVoto: (hash: string) =>
     request<{

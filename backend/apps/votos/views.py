@@ -1,15 +1,21 @@
-from django.db.models import Count
+from django.http import Http404
+from django.core import signing
+from django.core.signing import BadSignature, SignatureExpired
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.assembleias.models import Assembleia, OpcaoVoto, Questao
 from apps.eleitores.models import Eleitor
+from core.permissions import IsAdminWithRole, get_user_condominios
 
 from .models import Voto
-from .serializers import VotoCreateSerializer
+from .serializers import RelatorioVotoSerializer, VotoCreateSerializer
+
+
+VOTE_AUTH_MAX_AGE_SECONDS = 900
 
 
 def get_client_ip(request):
@@ -17,6 +23,85 @@ def get_client_ip(request):
     if x_forwarded_for:
         return x_forwarded_for.split(",")[0].strip()
     return request.META.get("REMOTE_ADDR", "0.0.0.0")
+
+
+def get_client_user_agent(request):
+    return str(request.META.get("HTTP_USER_AGENT", "")).strip()
+
+
+def infer_device_info(user_agent):
+    if not user_agent:
+        return "Não informado"
+
+    ua = user_agent.lower()
+
+    if "iphone" in ua:
+        platform = "iPhone"
+    elif "ipad" in ua:
+        platform = "iPad"
+    elif "android" in ua:
+        platform = "Android"
+    elif "windows" in ua:
+        platform = "Windows"
+    elif "mac os x" in ua or "macintosh" in ua:
+        platform = "macOS"
+    elif "linux" in ua:
+        platform = "Linux"
+    else:
+        platform = "Dispositivo desconhecido"
+
+    if "edg/" in ua:
+        browser = "Edge"
+    elif "chrome/" in ua and "edg/" not in ua:
+        browser = "Chrome"
+    elif "firefox/" in ua:
+        browser = "Firefox"
+    elif "safari/" in ua and "chrome/" not in ua:
+        browser = "Safari"
+    else:
+        browser = "Navegador desconhecido"
+
+    return f"{platform} / {browser}"
+
+
+def get_accessible_assembleia(request, assembleia_id):
+    assembleia = get_object_or_404(Assembleia.objects.select_related("condominio"), id=assembleia_id)
+    cond_ids = get_user_condominios(request.user)
+    if cond_ids is not None and assembleia.condominio_id not in cond_ids:
+        raise Http404
+    return assembleia
+
+
+def resolve_vote_auth_token(auth_token, assembleia_id):
+    try:
+        payload = signing.loads(
+            auth_token,
+            salt="vote-auth",
+            max_age=VOTE_AUTH_MAX_AGE_SECONDS,
+        )
+    except SignatureExpired:
+        raise ValueError("Autenticação expirada. Refaça a verificação para votar.")
+    except BadSignature:
+        raise ValueError("Token de autenticação inválido.")
+
+    token_assembleia_id = str(payload.get("assembleia_id", ""))
+    token_eleitor_id = str(payload.get("eleitor_id", ""))
+    token_method = str(payload.get("method", "")).strip().lower()
+
+    if not token_eleitor_id or not token_assembleia_id or not token_method:
+        raise ValueError("Token de autenticação incompleto.")
+
+    if token_assembleia_id != str(assembleia_id):
+        raise ValueError("Token de autenticação não pertence a esta assembleia.")
+
+    allowed_methods = {choice for choice, _label in Voto.MetodoAuth.choices}
+    if token_method not in allowed_methods:
+        raise ValueError("Método de autenticação inválido no token.")
+
+    return {
+        "eleitor_id": token_eleitor_id,
+        "metodo_auth": token_method,
+    }
 
 
 @api_view(["POST"])
@@ -33,11 +118,23 @@ def registrar_voto(request, assembleia_id):
     serializer = VotoCreateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
 
-    eleitor_id = request.data.get("eleitor_id")
-    if not eleitor_id:
+    try:
+        auth_context = resolve_vote_auth_token(
+            serializer.validated_data["auth_token"],
+            assembleia.id,
+        )
+    except ValueError as exc:
         return Response(
-            {"error": "eleitor_id é obrigatório"},
-            status=status.HTTP_400_BAD_REQUEST,
+            {"error": str(exc)},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    eleitor_id = auth_context["eleitor_id"]
+    request_eleitor_id = serializer.validated_data.get("eleitor_id")
+    if request_eleitor_id and str(request_eleitor_id) != eleitor_id:
+        return Response(
+            {"error": "Token de autenticação não corresponde ao eleitor informado"},
+            status=status.HTTP_403_FORBIDDEN,
         )
 
     eleitor = get_object_or_404(Eleitor, id=eleitor_id)
@@ -66,8 +163,10 @@ def registrar_voto(request, assembleia_id):
         eleitor=eleitor,
         questao=questao,
         opcao_escolhida=opcao,
-        metodo_auth=serializer.validated_data["metodo_auth"],
+        metodo_auth=auth_context["metodo_auth"],
         ip_address=get_client_ip(request),
+        user_agent=get_client_user_agent(request),
+        device_info=infer_device_info(get_client_user_agent(request)),
     )
     voto.save()
 
@@ -82,9 +181,9 @@ def registrar_voto(request, assembleia_id):
 
 
 @api_view(["GET"])
-@permission_classes([IsAdminUser])
+@permission_classes([IsAdminWithRole])
 def resultados(request, assembleia_id):
-    assembleia = get_object_or_404(Assembleia, id=assembleia_id)
+    assembleia = get_accessible_assembleia(request, assembleia_id)
     questoes = assembleia.questoes.prefetch_related("opcoes").all()
 
     data = []
@@ -121,6 +220,26 @@ def resultados(request, assembleia_id):
         )
 
     return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminWithRole])
+def relatorio_detalhado(request, assembleia_id):
+    assembleia = get_accessible_assembleia(request, assembleia_id)
+    votos = (
+        Voto.objects.filter(assembleia=assembleia)
+        .select_related("eleitor", "questao", "opcao_escolhida")
+        .order_by("-timestamp")
+    )
+
+    return Response(
+        {
+            "assembleia_id": str(assembleia.id),
+            "assembleia_titulo": assembleia.titulo,
+            "total_registros": votos.count(),
+            "votos": RelatorioVotoSerializer(votos, many=True).data,
+        }
+    )
 
 
 @api_view(["GET"])

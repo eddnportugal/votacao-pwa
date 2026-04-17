@@ -20,9 +20,10 @@ class VotoSerializer(serializers.ModelSerializer):
 
 
 class VotoCreateSerializer(serializers.Serializer):
+    eleitor_id = serializers.UUIDField(required=False)
     questao_id = serializers.UUIDField()
     opcao_id = serializers.UUIDField()
-    metodo_auth = serializers.ChoiceField(choices=Voto.MetodoAuth.choices)
+    auth_token = serializers.CharField()
 
 
 class ResultadoQuestaoSerializer(serializers.Serializer):
@@ -37,3 +38,36 @@ class ComprovanteSerializer(serializers.Serializer):
     questao = serializers.CharField()
     timestamp = serializers.DateTimeField()
     metodo_auth = serializers.CharField()
+
+
+class RelatorioVotoSerializer(serializers.ModelSerializer):
+    eleitor_nome = serializers.CharField(source="eleitor.nome", read_only=True)
+    bloco = serializers.CharField(source="eleitor.bloco", read_only=True)
+    apartamento = serializers.CharField(source="eleitor.apartamento", read_only=True)
+    perfil = serializers.CharField(source="eleitor.perfil", read_only=True)
+    por_procuracao = serializers.SerializerMethodField()
+    questao_titulo = serializers.CharField(source="questao.titulo", read_only=True)
+    opcao_texto = serializers.CharField(source="opcao_escolhida.texto", read_only=True)
+    tipo_autenticacao = serializers.CharField(source="metodo_auth", read_only=True)
+
+    class Meta:
+        model = Voto
+        fields = [
+            "id",
+            "eleitor_nome",
+            "bloco",
+            "apartamento",
+            "perfil",
+            "por_procuracao",
+            "questao_titulo",
+            "opcao_texto",
+            "tipo_autenticacao",
+            "ip_address",
+            "device_info",
+            "user_agent",
+            "timestamp",
+            "hash_voto",
+        ]
+
+    def get_por_procuracao(self, obj):
+        return obj.eleitor.perfil == "procurador"

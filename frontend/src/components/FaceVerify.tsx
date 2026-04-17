@@ -134,8 +134,9 @@ export default function FaceVerify({
         return;
       }
 
-      // Match! Gerar hash e pedir token ao servidor
-      const hash = await hashDescriptor(newDescriptor);
+      // Match! Enviar ao servidor a assinatura do descritor de cadastro
+      // persistido localmente, que corresponde ao hash salvo no backend.
+      const hash = await hashDescriptor(storedDescriptor.current);
 
       const result = await api.facialAuthVerify(eleitorId, assembleiaId, hash);
 
